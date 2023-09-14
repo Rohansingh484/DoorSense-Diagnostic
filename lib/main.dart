@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:io' show Platform;
 
+import 'debug_main.dart';
+
 enum StatusCheck { idle, loading, success, failure } //declare state check
 
 void main() {
@@ -116,6 +118,44 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  Future<void> scanForBluetooth() async {
+    // Note: You must call discoverServices after every connection!
+    // Setup Listener for scan results.
+// device not found? see "Common Problems" in the README
+    Set<DeviceIdentifier> seen = {};
+    var subscription = FlutterBluePlus.scanResults.listen(
+            (results) {
+          for (ScanResult r in results) {
+            if (seen.contains(r.device.remoteId) == false) {
+              print('${r.device.remoteId}: "${r.device.localName}" found! rssi: ${r.rssi}');
+              seen.add(r.device.remoteId);
+            }
+          }
+        },
+    );
+
+// Start scanning
+// Note: You should always call `scanResults.listen` before you call startScan!
+    await FlutterBluePlus.startScan();
+
+  }
+
+  void findDeviceScreen() {
+    showModalBottomSheet(
+        context: context,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(25.0),
+          ),
+        ),
+        builder: (context) {
+          return const SizedBox(
+              height: 450,
+              child: FindDevicesScreen());
+        }
+    );
+  }
+
 // can be edited
   @override
   Widget build(BuildContext context) {
@@ -139,6 +179,9 @@ class _MyHomePageState extends State<MyHomePage> {
               leading: leadingIconState(stepTwoStatus),
               title: const Text("Step 2: Connect to Bluetooth"),
               trailing: const Icon(Icons.arrow_forward_ios_outlined),
+              onTap: () async {
+                findDeviceScreen();
+              },
             ),
             ListTile(
               leading: leadingIconState(stepThreeStatus),
