@@ -193,6 +193,30 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
                             await widget.onReadPressed!();
                             setState(() {});
                           }),
+                    TextButton(onPressed: () { showDialog(
+                      context: context,
+                      barrierDismissible: false, // user must tap button!
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title:  const Text('Bluetooth Message'),
+                          content: SingleChildScrollView(
+                            child: ListBody(
+                              children: <Widget>[
+                                Text(value.toString()),
+                              ],
+                            ),
+                          ),
+                          actions: <Widget>[
+                            TextButton(
+                              child: const Text('OK'),
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                          ],
+                        );
+                      },
+                    );}, child: const Text("Display Message")),
                     if (widget.characteristic.properties.write)
                       TextButton(
                           child: Text(widget.characteristic.properties.writeWithoutResponse ? "WriteNoResp" : "Write"),
