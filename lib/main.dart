@@ -71,6 +71,9 @@ class _MyHomePageState extends State<MyHomePage> {
   StatusCheck stepFiveStatus = StatusCheck.idle;
   StatusCheck stepSixStatus = StatusCheck.idle;
 
+  BluetoothDevice? doorSenseDevice;
+  Set<DeviceIdentifier> seen = {};
+
 
   Widget leadingIconState(StatusCheck status) {
     switch (status) {
@@ -178,6 +181,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
+        backgroundColor: doorSenseDevice?.localName == '' ? Colors.green : Colors.red,
         centerTitle: true,
       ),
       body: Center(
@@ -196,40 +200,159 @@ class _MyHomePageState extends State<MyHomePage> {
               title: const Text("Step 2: Connect to Bluetooth"),
               trailing: const Icon(Icons.arrow_forward_ios_outlined),
               onTap: () async {
-                findDeviceScreen();
+
+    showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text('Connect to Bluetooth'),
+        content: Text(doorSenseDevice?.localName ?? ''),
+        actions: [
+          TextButton(onPressed: () async {
+            try {
+              // Start scanning for devices
+              FlutterBluePlus.startScan(timeout: Duration(seconds: 4));
+
+              // Listen for scanned devices
+              FlutterBluePlus.scanResults.listen((scanResult) {
+                for (var result in scanResult) {
+                  if (result.device.localName == 'DoorSense') {
+                    // Found the DoorSense device
+                    doorSenseDevice = result.device;
+                    print("DoorSense found!!!");
+                    FlutterBluePlus.stopScan();
+                    if (doorSenseDevice != null) {
+                      print(doorSenseDevice!.localName);
+                    }
+                    // Navigator.of(context).pop();
+                    break;
+                  }
+                }
+              });
+
+              // Connect to the DoorSense device
+              if (doorSenseDevice != null) {
+                await doorSenseDevice!.connect();
+
+            print("DoorSense successfully connected!!!");
+            // Navigate to the next step or perform actions here
+
+            // Don't forget to disconnect when you are done
+            // doorSenseDevice!.disconnect();
+            } else {
+            // Handle the case when the device is not found
+            // You can show an error message or take appropriate action
+            }
+            } catch (e) {
+            // Handle any errors that occur during the process
+            print('Error: $e');
+            stepTwoStatus = StatusCheck.failure;
+            } finally {
+            stepTwoStatus = StatusCheck.success;
+            Navigator.of(context).pop();
+            }
+          }, child: const Text("Connect")),
+          TextButton(onPressed: () {
+            Navigator.of(context).pop();
+          }, child: const Text("Cancel"))
+        ],
+      );
+    }
+    );
               },
             ),
             ListTile(
               leading: leadingIconState(stepThreeStatus),
               title: const Text("Step 3: Register Fingerprint"),
               trailing: const Icon(Icons.arrow_forward_ios_outlined),
-              onTap: () async {
-                // Reads all characteristics
-
-                showDialog(
+                onTap: () async {
+                  // Show a loading dialog
+                  showDialog(
                     context: context,
-                    barrierDismissible: false, // user must tap button!
+                    barrierDismissible: false,
                     builder: (BuildContext context) {
                       return AlertDialog(
                         title: const Text('Bluetooth Message'),
-                        content: const SingleChildScrollView(
-                          child: ListBody(
-                            children: <Widget>[
-                              Text(''),
-                            ],
-                          ),
-                        ),
+                        content: const CircularProgressIndicator(), // Add a loading indicator
                         actions: <Widget>[
-                          TextButton(
-                            child: const Text('Approve'),
-                            onPressed: () {
-                              Navigator.of(context).pop();
-                            },
-                          ),
+                          TextButton(onPressed: (){
+                            Navigator.of(context).pop();
+                          }, child: const Text("Cancel"))
                         ],
                       );
                     },
                   );
+                  if (doorSenseDevice?.localName == 'DoorSense') {
+
+                    print("Device found!");
+
+                    // Discover services
+                    List<BluetoothService> services = await doorSenseDevice!.discoverServices();
+                    // Find the service and characteristic where you want to write the "READY!" value
+                    for (BluetoothService service in services) {
+                      // Replace with the UUID of your service
+                      if (service.uuid == Guid('19B10000-E8F2-537E-4F6C-D104768A1214')) {
+                        print(service.uuid);
+                        for (BluetoothCharacteristic characteristic in service.characteristics) {
+                          // Replace with the UUID of your characteristic
+                          if (characteristic.uuid == Guid('19B10001-E8F2-537E-4F6C-D104768A1214')) {
+                            print(characteristic.uuid);
+                            //write a 1 to the board to indicate that the user is ready to register fingerprint
+                            await characteristic.write([0x1]);
+                            print("Write successful!");
+                            break;
+                          }
+                        }
+                        break;
+                      }
+                    }
+
+                    // Disconnect from the device
+                    // await r.device.disconnect();
+
+                    // Close the loading dialog
+                    Navigator.of(context).pop();
+
+                    String test = 'Start registration';
+                    // Show a success dialog or navigate to the next step
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: const Text('Waiting...'),
+                          content: const Text('Preparing to register fingerprint'),
+                          actions: <Widget>[
+                            TextButton(
+                              child: Text(test),
+                              onPressed: () async {
+                                // Discover services
+                                List<BluetoothService> services = await doorSenseDevice!.discoverServices();
+                                // Find the service and characteristic where you want to write the "READY!" value
+                                for (BluetoothService service in services) {
+                                  // Replace with the UUID of your service
+                                  if (service.uuid == Guid('19B10000-E8F2-537E-4F6C-D104768A1214')) {
+                                    print(service.uuid);
+                                    for (BluetoothCharacteristic characteristic in service.characteristics) {
+                                      // Replace with the UUID of your characteristic
+                                      if (characteristic.uuid == Guid('19B10001-E8F2-537E-4F6C-D104768A1214')) {
+                                        print(characteristic.uuid);
+                                        //write a 1 to the board to indicate that the user is ready to register fingerprint
+                                        List<int> value = await characteristic.read();
+                                        print(value);
+                                        break;
+                                      }
+                                    }
+                                    break;
+                                  }
+                                }
+                              },
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  }
                 }
             ),
             ListTile(
